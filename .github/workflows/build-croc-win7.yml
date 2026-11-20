@@ -55,8 +55,14 @@ jobs:
           GOARCH=386   go build -trimpath -ldflags "-s -w" -o ../out/win7-32bit/croc.exe .
           go version -m ../out/win7-64bit/croc.exe | head -n 1
 
-      - name: Upload
+      - name: Upload 64-bit
         uses: actions/upload-artifact@v4
         with:
-          name: croc-win7
-          path: out/
+          name: croc_${{ steps.ref.outputs.tag }}_Windows7-64bit
+          path: out/64bit/croc.exe
+
+      - name: Upload 32-bit
+        uses: actions/upload-artifact@v4
+        with:
+          name: croc_${{ steps.ref.outputs.tag }}_Windows7-32bit
+          path: out/32bit/croc.exe
