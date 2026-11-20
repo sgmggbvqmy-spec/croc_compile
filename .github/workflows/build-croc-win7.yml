@@ -1,0 +1,62 @@
+name: Build croc for Windows 7
+
+on:
+  workflow_dispatch:
+    inputs:
+      croc_tag:
+        description: "croc tag"
+        default: ""
+
+env:
+  GO_VERSION: "1.27.4"          # must match a release tag "patched-<version>" of https://github.com/XTLS/go-win7
+  GOTOOLCHAIN: local            # never download the official toolchain
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Resolve croc tag
+        id: ref
+        env:
+          GH_TOKEN: ${{ github.token }}
+          IN_TAG: ${{ inputs.croc_tag }}
+        run: |
+          tag="$IN_TAG"
+          [ -n "$tag" ] || tag=$(gh api repos/schollz/croc/releases/latest --jq .tag_name)
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout croc
+        uses: actions/checkout@v4
+        with:
+          repository: schollz/croc
+          ref: ${{ steps.ref.outputs.tag }}
+          path: croc
+
+      - name: Install Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: false
+
+      - name: Overlay patched Go SDK for Windows 7
+        run: |
+          curl -fsSL -o sdk.zip "https://github.com/XTLS/go-win7/releases/download/patched-${GO_VERSION}/go-for-win7-linux-amd64.zip"
+          unzip -l sdk.zip | head -n 8
+          unzip -q -o sdk.zip -d "$(go env GOROOT)"
+          go version
+
+      - name: Build
+        working-directory: croc
+        env:
+          GOOS: windows
+          CGO_ENABLED: "0"
+        run: |
+          GOARCH=amd64 go build -trimpath -ldflags "-s -w" -o ../out/win7-64bit/croc.exe .
+          GOARCH=386   go build -trimpath -ldflags "-s -w" -o ../out/win7-32bit/croc.exe .
+          go version -m ../out/win7-64bit/croc.exe | head -n 1
+
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: croc-win7
+          path: out/
