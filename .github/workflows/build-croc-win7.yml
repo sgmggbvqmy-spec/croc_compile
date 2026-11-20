@@ -7,6 +7,9 @@ on:
         description: "croc tag (empty = latest release)"
         default: ""
 
+permissions:
+  contents: write               # needed to create a GitHub Release
+
 env:
   GO_VERSION: "1.27.4"          # must match a release tag "patched-<version>" of https://github.com/XTLS/go-win7
   GOTOOLCHAIN: local            # never download the official toolchain
@@ -55,16 +58,23 @@ jobs:
           GOARCH=386   go build -trimpath -ldflags "-s -w" -o ../out/32bit/croc.exe .
           go version -m ../out/64bit/croc.exe | head -n 1
 
-      # The downloaded artifact is a zip named like the official release asset,
-      # e.g. croc_v11.6.5_Windows7-64bit.zip
-      - name: Upload 64-bit
-        uses: actions/upload-artifact@v4
-        with:
-          name: croc_${{ steps.ref.outputs.tag }}_Windows7-64bit
-          path: out/64bit/croc.exe
+      - name: Package
+        env:
+          TAG: ${{ steps.ref.outputs.tag }}
+        run: |
+          zip -j "croc_${TAG}_Windows7-64bit.zip" out/64bit/croc.exe
+          zip -j "croc_${TAG}_Windows7-32bit.zip" out/32bit/croc.exe
 
-      - name: Upload 32-bit
-        uses: actions/upload-artifact@v4
-        with:
-          name: croc_${{ steps.ref.outputs.tag }}_Windows7-32bit
-          path: out/32bit/croc.exe
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.ref.outputs.tag }}
+        run: |
+          rel="${TAG}-windows7"
+          if gh release view "$rel" >/dev/null 2>&1; then
+            gh release upload "$rel" croc_*.zip --clobber
+          else
+            gh release create "$rel" croc_*.zip \
+              --title "croc ${TAG} for Windows 7" \
+              --notes "Built from schollz/croc ${TAG} with the XTLS/go-win7 patched Go ${GO_VERSION}."
+          fi
