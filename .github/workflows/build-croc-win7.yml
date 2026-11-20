@@ -5,7 +5,7 @@ on:
     inputs:
       croc_tag:
         description: "croc tag (empty = latest release)"
-        default: ""
+        default: "v11.6.5"
 
 permissions:
   contents: write               # needed to create a GitHub Release
@@ -68,6 +68,7 @@ jobs:
       - name: Publish GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}   # no git checkout of this repo, so tell gh which repo to use
           TAG: ${{ steps.ref.outputs.tag }}
         run: |
           rel="${TAG}-windows7"
